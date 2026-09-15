@@ -2,13 +2,48 @@
  * Site identity & organisation details.
  * Everything brand-related lives here so it can be swapped without touching components.
  */
+/** Used when no usable site URL is configured. */
+const FALLBACK_SITE_URL = "https://medinest.example.com";
+
+/**
+ * Absolute origin of the deployment: canonical links, sitemap, OG images and every
+ * `new URL(path, siteConfig.url)` call are built from it.
+ *
+ * `NEXT_PUBLIC_*` values are inlined at build time, so a variable that exists but is
+ * blank inlines as `""` and makes `new URL("")` throw during `next build`. Each
+ * candidate is therefore validated and anything empty or malformed is skipped.
+ * Only `NEXT_PUBLIC_` variables are read, so server and client resolve to the same
+ * origin. Never returns a trailing slash — some call sites concatenate onto it.
+ */
+function resolveSiteUrl(): string {
+  const productionHost = process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL;
+  const deploymentHost = process.env.NEXT_PUBLIC_VERCEL_URL;
+  const candidates = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    productionHost && `https://${productionHost}`,
+    deploymentHost && `https://${deploymentHost}`,
+    FALLBACK_SITE_URL,
+  ];
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim().replace(/\/+$/, "");
+    if (!trimmed) continue;
+    try {
+      new URL(trimmed);
+      return trimmed;
+    } catch {
+      /* ignore malformed env value and try the next candidate */
+    }
+  }
+  return FALLBACK_SITE_URL;
+}
+
 export const siteConfig = {
   name: "MediNest",
   legalName: "MediNest Health Limited",
   tagline: "Medicine, wellness & care. Delivered.",
   description:
     "MediNest is a modern online pharmacy and healthcare store. Order authentic medicines, supplements, beauty, baby care and wellness products with fast home delivery.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://medinest.example.com",
+  url: resolveSiteUrl(),
   locale: "en_BD",
   language: "en",
   country: "Bangladesh",
